@@ -36,7 +36,7 @@ Pastikan caption dan script sangat menarik, relate dengan target ${targetMarket}
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'grok-3-latest',
+                model: 'grok-4-latest',
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt }
