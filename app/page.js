@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 
 export default function Home() {
   const [formData, setFormData] = useState({
@@ -16,7 +16,6 @@ export default function Home() {
   const [loadingStep, setLoadingStep] = useState('');
   const [results, setResults] = useState(null);
   const [toast, setToast] = useState('');
-  const [puterReady, setPuterReady] = useState(false);
   const fileInputRef = useRef(null);
 
   const targetMarketOptions = [
@@ -48,21 +47,6 @@ export default function Home() {
     { value: 'modern', label: 'Modern Minimalis' },
     { value: 'bold', label: 'Bold Vibrant' }
   ];
-
-  // Load Puter.js
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !window.puter) {
-      const script = document.createElement('script');
-      script.src = 'https://js.puter.com/v2/';
-      script.onload = () => {
-        setPuterReady(true);
-        console.log('Puter.js loaded successfully');
-      };
-      document.head.appendChild(script);
-    } else if (window.puter) {
-      setPuterReady(true);
-    }
-  }, []);
 
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
@@ -125,186 +109,101 @@ export default function Home() {
       return;
     }
 
-    if (!puterReady || !window.puter) {
-      showToast('Puter.js belum siap, tunggu sebentar...');
-      return;
-    }
-
     setIsLoading(true);
     setResults(null);
 
     try {
-      // Step 1: Analyze image and generate caption, hashtags, script using Puter.js
+      // Step 1: Analyze and generate caption, hashtags, script
       setLoadingStep('Menganalisis produk & membuat caption...');
+      const analyzeRes = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: productImageBase64,
+          productName: formData.productName,
+          targetMarket: formData.targetMarket,
+          salesStyle: formData.salesStyle,
+          voiceTone: formData.voiceTone
+        })
+      });
+      const analyzeData = await analyzeRes.json();
+      if (!analyzeRes.ok) throw new Error(analyzeData.error);
 
-      const analyzePrompt = `Kamu adalah content creator expert untuk produk muslimah Indonesia.
-Target market: ${formData.targetMarket}
-Gaya penjualan: ${formData.salesStyle}
-Nada suara: ${formData.voiceTone}
-
-Analisis produk "${formData.productName}" dan berikan response dalam format JSON (HANYA JSON, tanpa text lain):
-{
-  "productDescription": "deskripsi detail produk dalam 2-3 kalimat untuk prompt gambar AI",
-  "caption": "caption Instagram menarik 3-5 paragraf sesuai gaya ${formData.salesStyle} dan nada ${formData.voiceTone}",
-  "hashtags": ["hashtag1", "hashtag2", "hashtag3", "hashtag4", "hashtag5"],
-  "script": "script narasi video 30-60 detik dalam bahasa Indonesia, sesuai nada ${formData.voiceTone}, untuk voice over"
-}`;
-
-      const analyzeResponse = await window.puter.ai.chat(analyzePrompt, productImageBase64, { model: 'gemini-2.5-flash' });
-
-      // Puter.js returns response in different formats - handle all cases
-      let responseText = '';
-      if (typeof analyzeResponse === 'string') {
-        responseText = analyzeResponse;
-      } else if (analyzeResponse?.message?.content) {
-        responseText = analyzeResponse.message.content;
-      } else if (analyzeResponse?.text) {
-        responseText = analyzeResponse.text;
-      } else if (analyzeResponse?.content) {
-        responseText = analyzeResponse.content;
-      } else {
-        responseText = JSON.stringify(analyzeResponse);
-      }
-
-      console.log('AI Response:', responseText);
-
-      let analyzeData;
-      try {
-        // Try to extract JSON from markdown code blocks first
-        const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (codeBlockMatch) {
-          analyzeData = JSON.parse(codeBlockMatch[1].trim());
-        } else {
-          // Try to find JSON object
-          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            analyzeData = JSON.parse(jsonMatch[0]);
-          } else {
-            throw new Error('No JSON found in response');
-          }
-        }
-      } catch (e) {
-        console.error('Parse error:', e, 'Response:', responseText);
-        // Fallback: create data manually from response
-        analyzeData = {
-          productDescription: `${formData.productName} - produk berkualitas untuk ${formData.targetMarket}`,
-          caption: responseText.substring(0, 500) || `✨ ${formData.productName} - Produk pilihan untuk ${formData.targetMarket}! Dapatkan sekarang dengan harga spesial. 💕`,
-          hashtags: ['muslimah', 'hijabstyle', formData.productName.toLowerCase().replace(/\s+/g, ''), 'ootdmuslimah', 'affiliatemarketing'],
-          script: `Hai ${formData.targetMarket}! Kenalin nih, ${formData.productName}. Produk yang wajib kamu punya. Yuk order sekarang!`
-        };
-      }
-
-      // Step 2: Generate images using Nano Banana (Gemini Image)
-      setLoadingStep('Membuat variasi gambar produk...');
+      // Step 2: Generate placeholder images (Grok doesn't have image generation)
+      setLoadingStep('Menyiapkan variasi gambar...');
 
       const styleModifiers = {
-        elegant: 'soft pastel colors, elegant feminine aesthetic, delicate lighting, instagram-worthy',
-        modern: 'clean minimalist design, modern aesthetic, neutral tones with subtle color accents',
-        bold: 'vibrant colors, bold contrast, eye-catching dynamic composition, energetic mood'
+        elegant: 'soft pastel colors, elegant feminine aesthetic',
+        modern: 'clean minimalist design, modern aesthetic',
+        bold: 'vibrant colors, bold contrast'
       };
       const styleGuide = styleModifiers[formData.designStyle] || styleModifiers.elegant;
 
-      // Extract base64 data without the data URL prefix for Nano Banana
-      const base64Data = productImageBase64.split(',')[1] || productImageBase64;
-
+      // Create image prompts for manual generation later
       const imagePrompts = [
         {
           type: 'Dengan Model',
-          prompt: `Transform this product image: Show a beautiful confident Indonesian muslim woman wearing elegant hijab, holding and showcasing this exact product. ${styleGuide}, professional studio lighting, high-end fashion photography style, 4K quality. Keep the product exactly as shown.`,
-          useOriginal: true
+          prompt: `Professional product photography of ${formData.productName}. A beautiful confident Indonesian muslim woman wearing elegant hijab, showcasing the product. ${styleGuide}, professional studio lighting, 4K quality`,
+          url: productImage // Use uploaded image as placeholder
         },
         {
           type: 'Dengan Model',
-          prompt: `Transform this product image: Show a young modern Indonesian muslimah in casual hijab style, naturally using this exact product in a cozy home setting. ${styleGuide}, warm natural lighting, Instagram aesthetic. Keep the product exactly as shown.`,
-          useOriginal: true
+          prompt: `Lifestyle product shot of ${formData.productName}. Young modern Indonesian muslimah naturally using the product. ${styleGuide}, warm natural lighting, Instagram aesthetic`,
+          url: productImage
         },
         {
           type: 'Product Shot',
-          prompt: `Enhance this product image: Create a clean professional product photography. ${analyzeData.productDescription}. ${styleGuide}, professional commercial photography, clean white minimalist background, perfect lighting. Keep the product exactly as shown.`,
-          useOriginal: true
+          prompt: `Clean product photography of ${formData.productName}. ${analyzeData.productDescription}. ${styleGuide}, minimalist background`,
+          url: productImage
         },
         {
           type: 'Flat Lay',
-          prompt: `Transform this product image into aesthetic flat lay: Arrange this exact product beautifully with complementary props like flowers, fabric, or accessories. ${styleGuide}, top-down view, Instagram-worthy composition. Keep the product exactly as shown.`,
-          useOriginal: true
+          prompt: `Aesthetic flat lay photography of ${formData.productName}. ${styleGuide}, top-down view, Instagram-worthy composition`,
+          url: productImage
         }
       ];
 
-      const generatedImages = [];
-      for (let i = 0; i < imagePrompts.length; i++) {
-        setLoadingStep(`Membuat gambar ${i + 1} dari ${imagePrompts.length}...`);
-        try {
-          let imgElement;
-          if (imagePrompts[i].useOriginal) {
-            // Use image-to-image with Nano Banana Pro (Gemini 3 Pro Image)
-            imgElement = await window.puter.ai.txt2img(imagePrompts[i].prompt, {
-              model: 'gemini-2.5-flash-image-preview',
-              input_image: base64Data,
-              input_image_mime_type: 'image/jpeg'
-            });
-          } else {
-            imgElement = await window.puter.ai.txt2img(imagePrompts[i].prompt, {
-              model: 'gemini-2.5-flash-image-preview'
-            });
-          }
-          generatedImages.push({
-            type: imagePrompts[i].type,
-            description: imagePrompts[i].prompt,
-            url: imgElement.src
-          });
-        } catch (imgError) {
-          console.error('Image generation error:', imgError);
-          generatedImages.push({
-            type: imagePrompts[i].type,
-            description: imagePrompts[i].prompt,
-            url: `https://placehold.co/1024x1024/9B7B9B/ffffff?text=${encodeURIComponent(imagePrompts[i].type)}`
-          });
-        }
-      }
-
       // Step 3: Generate motion prompts
       setLoadingStep('Membuat prompt untuk motion...');
+      const motionRes = await fetch('/api/generate-motion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          images: imagePrompts,
+          productName: formData.productName,
+          script: analyzeData.script
+        })
+      });
+      const motionData = await motionRes.json();
+      if (!motionRes.ok) throw new Error(motionData.error);
 
-      const motionPrompt = `Buat motion prompt untuk ${generatedImages.length} gambar produk "${formData.productName}".
-Gambar-gambar:
-${generatedImages.map((img, i) => `${i + 1}. ${img.type}: ${img.description.substring(0, 100)}...`).join('\n')}
-
-Berikan response dalam format JSON array (HANYA JSON):
-["motion prompt gambar 1", "motion prompt gambar 2", "motion prompt gambar 3", "motion prompt gambar 4"]
-
-Motion prompts harus dalam Bahasa Inggris, berisi deskripsi gerakan kamera (zoom, pan, dolly) dan timing.`;
-
-      const motionResponse = await window.puter.ai.chat(motionPrompt, { model: 'gemini-2.5-flash' });
-
-      let motionPrompts;
-      try {
-        const jsonMatch = motionResponse.match(/\[[\s\S]*\]/);
-        motionPrompts = JSON.parse(jsonMatch ? jsonMatch[0] : '[]');
-      } catch (e) {
-        motionPrompts = generatedImages.map((_, i) =>
-          `Slow ${i % 2 === 0 ? 'zoom in' : 'pan right'} over ${(i + 1) * 3} seconds, cinematic motion`
-        );
-      }
-
-      // Step 4: Generate voice over using Puter.js TTS
+      // Step 4: Generate voice over
       setLoadingStep('Membuat voice over...');
-
       let audioUrl = '';
       try {
-        const audioElement = await window.puter.ai.txt2speech(analyzeData.script, { model: 'tts-1' });
-        audioUrl = audioElement.src;
-      } catch (ttsError) {
-        console.error('TTS error:', ttsError);
-        audioUrl = '';
+        const voiceRes = await fetch('/api/generate-voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            script: analyzeData.script,
+            voiceTone: formData.voiceTone
+          })
+        });
+        const voiceData = await voiceRes.json();
+        if (voiceRes.ok) {
+          audioUrl = voiceData.audioUrl;
+        }
+      } catch (voiceError) {
+        console.error('Voice error:', voiceError);
       }
 
       setResults({
         caption: analyzeData.caption,
         hashtags: analyzeData.hashtags,
         script: analyzeData.script,
-        images: generatedImages.map((img, i) => ({
+        images: imagePrompts.map((img, i) => ({
           ...img,
-          motionPrompt: motionPrompts[i] || 'Slow zoom in, 3 seconds'
+          motionPrompt: motionData.motionPrompts[i] || 'Slow zoom in, 3 seconds'
         })),
         audioUrl
       });
@@ -333,7 +232,7 @@ Motion prompts harus dalam Bahasa Inggris, berisi deskripsi gerakan kamera (zoom
         <h1>✨ Muslimah Content Creator</h1>
         <p>AI-Powered Content Generator untuk Affiliasi Produk Muslimah</p>
         <small style={{ opacity: 0.8, marginTop: '5px', display: 'block' }}>
-          🆓 Powered by Gemini + Nano Banana - Gratis Tanpa API Key!
+          🚀 Powered by Grok AI
         </small>
       </header>
 
@@ -449,15 +348,13 @@ Motion prompts harus dalam Bahasa Inggris, berisi deskripsi gerakan kamera (zoom
               <button
                 className="btn btn-primary"
                 onClick={handleGenerate}
-                disabled={isLoading || !puterReady}
+                disabled={isLoading}
               >
                 {isLoading ? (
                   <>
                     <div className="spinner"></div>
                     Generating...
                   </>
-                ) : !puterReady ? (
-                  <>Loading AI...</>
                 ) : (
                   <>✨ Generate Content</>
                 )}
@@ -497,15 +394,25 @@ Motion prompts harus dalam Bahasa Inggris, berisi deskripsi gerakan kamera (zoom
                   </div>
                 </div>
 
-                {/* Generated Images */}
+                {/* Image Prompts */}
                 <div className="result-block">
-                  <div className="result-block-title">🖼️ Variasi Gambar</div>
+                  <div className="result-block-title">🖼️ Prompt Gambar (untuk AI Image Generator)</div>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '15px' }}>
+                    Gunakan prompt ini di DALL-E, Midjourney, atau AI image generator lainnya
+                  </p>
                   <div className="image-grid">
                     {results.images.map((img, i) => (
-                      <div key={i} className="image-item">
-                        <img src={img.url} alt={img.description} />
-                        <span className="image-badge">{img.type}</span>
-                        <div className="motion-prompt">
+                      <div key={i} className="image-item" style={{ aspectRatio: 'auto', padding: '15px' }}>
+                        <div style={{ fontWeight: '600', marginBottom: '8px', color: 'var(--primary)' }}>{img.type}</div>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>{img.prompt}</p>
+                        <button
+                          className="copy-btn"
+                          style={{ display: 'block' }}
+                          onClick={() => copyToClipboard(img.prompt)}
+                        >
+                          Copy Prompt
+                        </button>
+                        <div className="motion-prompt" style={{ marginTop: '10px' }}>
                           <div className="motion-prompt-label">Motion Prompt:</div>
                           <div className="motion-prompt-text">{img.motionPrompt}</div>
                         </div>

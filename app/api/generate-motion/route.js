@@ -4,20 +4,20 @@ export async function POST(request) {
     try {
         const { images, productName, script } = await request.json();
 
-        const apiKey = process.env.OPENAI_API_KEY;
+        const apiKey = process.env.GROK_API_KEY;
         if (!apiKey) {
-            return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+            return NextResponse.json({ error: 'Grok API key not configured' }, { status: 500 });
         }
 
-        // Generate motion prompts for each image using GPT
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        // Generate motion prompts for each image using Grok
+        const response = await fetch('https://api.x.ai/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'gpt-4o-mini',
+                model: 'grok-3-latest',
                 messages: [
                     {
                         role: 'system',
@@ -35,14 +35,14 @@ Semua prompt harus dalam Bahasa Inggris untuk kompatibilitas dengan AI tools.`
                     },
                     {
                         role: 'user',
-                        content: `Buat motion prompt untuk ${images.length} gambar produk "${productName}" berikut:
-
-${images.map((img, i) => `Gambar ${i + 1} (${img.type}): ${img.description}`).join('\n\n')}
+                        content: `Buat motion prompt untuk ${images.length} gambar produk "${productName}".
+Gambar-gambar:
+${images.map((img, i) => `${i + 1}. ${img.type}: ${img.description?.substring(0, 100) || 'Product image'}...`).join('\n')}
 
 Script narasi yang akan digunakan:
 ${script}
 
-Berikan response dalam format JSON array:
+Berikan response dalam format JSON array (HANYA JSON):
 ["motion prompt gambar 1", "motion prompt gambar 2", ...]
 
 Motion prompts harus:
@@ -52,14 +52,15 @@ Motion prompts harus:
 4. Cocok untuk video marketing produk muslimah`
                     }
                 ],
-                max_tokens: 1500
+                temperature: 0.7,
+                stream: false
             })
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-            console.error('Motion API Error:', data);
+            console.error('Grok Motion API Error:', data);
             return NextResponse.json({ error: data.error?.message || 'Motion generation failed' }, { status: 500 });
         }
 
@@ -69,7 +70,9 @@ Motion prompts harus:
             const content = data.choices[0].message.content;
             // Extract JSON from markdown code block if present
             const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-            motionPrompts = JSON.parse(jsonMatch[1].trim());
+            const jsonStr = jsonMatch[1] ? jsonMatch[1].trim() : content;
+            const arrMatch = jsonStr.match(/\[[\s\S]*\]/);
+            motionPrompts = JSON.parse(arrMatch ? arrMatch[0] : '[]');
         } catch (e) {
             console.error('Parse error:', e);
             // Fallback to generic motion prompts

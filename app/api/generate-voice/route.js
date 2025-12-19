@@ -4,18 +4,22 @@ export async function POST(request) {
     try {
         const { script, voiceTone } = await request.json();
 
-        const apiKey = process.env.OPENAI_API_KEY;
-        if (!apiKey) {
-            return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+        // Since Grok doesn't have TTS, we'll use OpenAI TTS if available
+        // Otherwise, return empty to skip voice generation
+        const openaiKey = process.env.OPENAI_API_KEY;
+
+        if (!openaiKey) {
+            // No TTS available, return empty
+            return NextResponse.json({ audioUrl: '', message: 'TTS not configured' });
         }
 
         // Map voice tone to OpenAI TTS voice
         const voiceMap = {
-            'Ramah & Hangat': 'nova',      // Warm and friendly
-            'Profesional': 'onyx',          // Professional and clear
-            'Islami Lembut': 'shimmer',     // Soft and gentle
-            'Energik': 'alloy',             // Energetic
-            'Santai & Casual': 'echo'       // Casual and relaxed
+            'Ramah & Hangat': 'nova',
+            'Profesional': 'onyx',
+            'Islami Lembut': 'shimmer',
+            'Energik': 'alloy',
+            'Santai & Casual': 'echo'
         };
 
         const voice = voiceMap[voiceTone] || 'nova';
@@ -25,7 +29,7 @@ export async function POST(request) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
+                'Authorization': `Bearer ${openaiKey}`
             },
             body: JSON.stringify({
                 model: 'tts-1',
@@ -38,7 +42,7 @@ export async function POST(request) {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             console.error('TTS Error:', errorData);
-            return NextResponse.json({ error: errorData.error?.message || 'TTS generation failed' }, { status: 500 });
+            return NextResponse.json({ audioUrl: '', error: errorData.error?.message || 'TTS generation failed' });
         }
 
         // Get the audio as array buffer
@@ -52,6 +56,6 @@ export async function POST(request) {
 
     } catch (error) {
         console.error('Generate voice error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ audioUrl: '', error: error.message });
     }
 }
