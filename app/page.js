@@ -150,7 +150,7 @@ Analisis produk "${formData.productName}" dan berikan response dalam format JSON
   "script": "script narasi video 30-60 detik dalam bahasa Indonesia, sesuai nada ${formData.voiceTone}, untuk voice over"
 }`;
 
-      const analyzeResponse = await window.puter.ai.chat(analyzePrompt, productImageBase64, { model: 'gpt-4o' });
+      const analyzeResponse = await window.puter.ai.chat(analyzePrompt, productImageBase64, { model: 'gemini-2.5-flash' });
 
       // Puter.js returns response in different formats - handle all cases
       let responseText = '';
@@ -194,7 +194,7 @@ Analisis produk "${formData.productName}" dan berikan response dalam format JSON
         };
       }
 
-      // Step 2: Generate images using Puter.js DALL-E
+      // Step 2: Generate images using Nano Banana (Gemini Image)
       setLoadingStep('Membuat variasi gambar produk...');
 
       const styleModifiers = {
@@ -204,22 +204,29 @@ Analisis produk "${formData.productName}" dan berikan response dalam format JSON
       };
       const styleGuide = styleModifiers[formData.designStyle] || styleModifiers.elegant;
 
+      // Extract base64 data without the data URL prefix for Nano Banana
+      const base64Data = productImageBase64.split(',')[1] || productImageBase64;
+
       const imagePrompts = [
         {
           type: 'Dengan Model',
-          prompt: `Professional product photography of ${formData.productName}. A beautiful confident Indonesian muslim woman wearing elegant hijab, showcasing the product ${analyzeData.productDescription}. ${styleGuide}, professional studio lighting, high-end fashion photography style, 4K quality`
+          prompt: `Transform this product image: Show a beautiful confident Indonesian muslim woman wearing elegant hijab, holding and showcasing this exact product. ${styleGuide}, professional studio lighting, high-end fashion photography style, 4K quality. Keep the product exactly as shown.`,
+          useOriginal: true
         },
         {
           type: 'Dengan Model',
-          prompt: `Lifestyle product shot of ${formData.productName}. Young modern Indonesian muslimah in casual hijab style, naturally using the product ${analyzeData.productDescription} in a cozy home setting. ${styleGuide}, warm natural lighting, Instagram aesthetic`
+          prompt: `Transform this product image: Show a young modern Indonesian muslimah in casual hijab style, naturally using this exact product in a cozy home setting. ${styleGuide}, warm natural lighting, Instagram aesthetic. Keep the product exactly as shown.`,
+          useOriginal: true
         },
         {
           type: 'Product Shot',
-          prompt: `Clean product photography of ${formData.productName}. ${analyzeData.productDescription}. Isolated product shot with beautiful ${styleGuide}, professional commercial photography, minimalist background`
+          prompt: `Enhance this product image: Create a clean professional product photography. ${analyzeData.productDescription}. ${styleGuide}, professional commercial photography, clean white minimalist background, perfect lighting. Keep the product exactly as shown.`,
+          useOriginal: true
         },
         {
           type: 'Flat Lay',
-          prompt: `Aesthetic flat lay photography of ${formData.productName}. ${analyzeData.productDescription} arranged beautifully with complementary props. ${styleGuide}, top-down view, Instagram-worthy composition`
+          prompt: `Transform this product image into aesthetic flat lay: Arrange this exact product beautifully with complementary props like flowers, fabric, or accessories. ${styleGuide}, top-down view, Instagram-worthy composition. Keep the product exactly as shown.`,
+          useOriginal: true
         }
       ];
 
@@ -227,7 +234,19 @@ Analisis produk "${formData.productName}" dan berikan response dalam format JSON
       for (let i = 0; i < imagePrompts.length; i++) {
         setLoadingStep(`Membuat gambar ${i + 1} dari ${imagePrompts.length}...`);
         try {
-          const imgElement = await window.puter.ai.txt2img(imagePrompts[i].prompt, { model: 'dall-e-3' });
+          let imgElement;
+          if (imagePrompts[i].useOriginal) {
+            // Use image-to-image with Nano Banana Pro (Gemini 3 Pro Image)
+            imgElement = await window.puter.ai.txt2img(imagePrompts[i].prompt, {
+              model: 'gemini-3-pro-image-preview',
+              input_image: base64Data,
+              input_image_mime_type: 'image/jpeg'
+            });
+          } else {
+            imgElement = await window.puter.ai.txt2img(imagePrompts[i].prompt, {
+              model: 'gemini-3-pro-image-preview'
+            });
+          }
           generatedImages.push({
             type: imagePrompts[i].type,
             description: imagePrompts[i].prompt,
@@ -255,7 +274,7 @@ Berikan response dalam format JSON array (HANYA JSON):
 
 Motion prompts harus dalam Bahasa Inggris, berisi deskripsi gerakan kamera (zoom, pan, dolly) dan timing.`;
 
-      const motionResponse = await window.puter.ai.chat(motionPrompt, { model: 'gpt-4o-mini' });
+      const motionResponse = await window.puter.ai.chat(motionPrompt, { model: 'gemini-2.5-flash' });
 
       let motionPrompts;
       try {
@@ -314,7 +333,7 @@ Motion prompts harus dalam Bahasa Inggris, berisi deskripsi gerakan kamera (zoom
         <h1>✨ Muslimah Content Creator</h1>
         <p>AI-Powered Content Generator untuk Affiliasi Produk Muslimah</p>
         <small style={{ opacity: 0.8, marginTop: '5px', display: 'block' }}>
-          🆓 Powered by Puter.js - Gratis Tanpa API Key!
+          🆓 Powered by Gemini + Nano Banana - Gratis Tanpa API Key!
         </small>
       </header>
 
