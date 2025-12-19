@@ -17,7 +17,7 @@ export async function POST(request) {
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'grok-4-latest',
+                model: 'grok-beta',
                 messages: [
                     {
                         role: 'system',
