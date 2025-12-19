@@ -238,13 +238,13 @@ Analisis produk "${formData.productName}" dan berikan response dalam format JSON
           if (imagePrompts[i].useOriginal) {
             // Use image-to-image with Nano Banana Pro (Gemini 3 Pro Image)
             imgElement = await window.puter.ai.txt2img(imagePrompts[i].prompt, {
-              model: 'gemini-3-pro-image-preview',
+              model: 'gemini-2.5-flash-image-preview',
               input_image: base64Data,
               input_image_mime_type: 'image/jpeg'
             });
           } else {
             imgElement = await window.puter.ai.txt2img(imagePrompts[i].prompt, {
-              model: 'gemini-3-pro-image-preview'
+              model: 'gemini-2.5-flash-image-preview'
             });
           }
           generatedImages.push({
