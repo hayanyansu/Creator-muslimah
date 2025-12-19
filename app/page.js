@@ -152,13 +152,46 @@ Analisis produk "${formData.productName}" dan berikan response dalam format JSON
 
       const analyzeResponse = await window.puter.ai.chat(analyzePrompt, productImageBase64, { model: 'gpt-4o' });
 
+      // Puter.js returns response in different formats - handle all cases
+      let responseText = '';
+      if (typeof analyzeResponse === 'string') {
+        responseText = analyzeResponse;
+      } else if (analyzeResponse?.message?.content) {
+        responseText = analyzeResponse.message.content;
+      } else if (analyzeResponse?.text) {
+        responseText = analyzeResponse.text;
+      } else if (analyzeResponse?.content) {
+        responseText = analyzeResponse.content;
+      } else {
+        responseText = JSON.stringify(analyzeResponse);
+      }
+
+      console.log('AI Response:', responseText);
+
       let analyzeData;
       try {
-        const jsonMatch = analyzeResponse.match(/\{[\s\S]*\}/);
-        analyzeData = JSON.parse(jsonMatch ? jsonMatch[0] : analyzeResponse);
+        // Try to extract JSON from markdown code blocks first
+        const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlockMatch) {
+          analyzeData = JSON.parse(codeBlockMatch[1].trim());
+        } else {
+          // Try to find JSON object
+          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            analyzeData = JSON.parse(jsonMatch[0]);
+          } else {
+            throw new Error('No JSON found in response');
+          }
+        }
       } catch (e) {
-        console.error('Parse error:', e);
-        throw new Error('Gagal parse response AI');
+        console.error('Parse error:', e, 'Response:', responseText);
+        // Fallback: create data manually from response
+        analyzeData = {
+          productDescription: `${formData.productName} - produk berkualitas untuk ${formData.targetMarket}`,
+          caption: responseText.substring(0, 500) || `✨ ${formData.productName} - Produk pilihan untuk ${formData.targetMarket}! Dapatkan sekarang dengan harga spesial. 💕`,
+          hashtags: ['muslimah', 'hijabstyle', formData.productName.toLowerCase().replace(/\s+/g, ''), 'ootdmuslimah', 'affiliatemarketing'],
+          script: `Hai ${formData.targetMarket}! Kenalin nih, ${formData.productName}. Produk yang wajib kamu punya. Yuk order sekarang!`
+        };
       }
 
       // Step 2: Generate images using Puter.js DALL-E
