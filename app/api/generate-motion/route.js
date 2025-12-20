@@ -4,20 +4,20 @@ export async function POST(request) {
     try {
         const { images, productName, script } = await request.json();
 
-        const apiKey = process.env.OPENAI_API_KEY;
+        const apiKey = process.env.PERPLEXITY_API_KEY;
         if (!apiKey) {
-            return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+            return NextResponse.json({ error: 'Perplexity API key not configured' }, { status: 500 });
         }
 
-        // Generate motion prompts using GPT-4
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        // Generate motion prompts using Perplexity Sonar
+        const response = await fetch('https://api.perplexity.ai/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'gpt-4o-mini',
+                model: 'sonar',
                 messages: [
                     {
                         role: 'system',
@@ -31,7 +31,8 @@ Format motion prompt yang baik:
 - Durasi yang disarankan
 - Transisi ke shot berikutnya
 
-Semua prompt harus dalam Bahasa Inggris untuk kompatibilitas dengan AI tools.`
+Semua prompt harus dalam Bahasa Inggris untuk kompatibilitas dengan AI tools.
+PENTING: Berikan response dalam format JSON array saja, tanpa markdown code block.`
                     },
                     {
                         role: 'user',
@@ -42,25 +43,20 @@ ${images.map((img, i) => `${i + 1}. ${img.type}: ${img.description?.substring(0,
 Script narasi yang akan digunakan:
 ${script}
 
-Berikan response dalam format JSON array (HANYA JSON):
-["motion prompt gambar 1", "motion prompt gambar 2", ...]
-
-Motion prompts harus:
-1. Terstruktur dan saling terhubung sebagai sequence
-2. Timing sesuai dengan script narasi
-3. Smooth transisi antar shot
-4. Cocok untuk video marketing produk muslimah`
+Berikan response dalam format JSON array (HANYA JSON, tanpa markdown):
+["motion prompt gambar 1", "motion prompt gambar 2", "motion prompt gambar 3", "motion prompt gambar 4"]`
                     }
                 ],
                 temperature: 0.7,
-                max_tokens: 1000
+                max_tokens: 1000,
+                disable_search: true
             })
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-            console.error('OpenAI Motion API Error:', data);
+            console.error('Perplexity Motion API Error:', data);
             return NextResponse.json({ error: data.error?.message || 'Motion generation failed' }, { status: 500 });
         }
 

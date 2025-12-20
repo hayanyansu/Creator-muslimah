@@ -129,8 +129,8 @@ export default function Home() {
       const analyzeData = await analyzeRes.json();
       if (!analyzeRes.ok) throw new Error(analyzeData.error);
 
-      // Step 2: Generate images with DALL-E 3
-      setLoadingStep('Membuat variasi gambar produk...');
+      // Step 2: Generate image prompts
+      setLoadingStep('Membuat prompt gambar...');
       const imagesRes = await fetch('/api/generate-images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -157,26 +157,6 @@ export default function Home() {
       const motionData = await motionRes.json();
       if (!motionRes.ok) throw new Error(motionData.error);
 
-      // Step 4: Generate voice over
-      setLoadingStep('Membuat voice over...');
-      let audioUrl = '';
-      try {
-        const voiceRes = await fetch('/api/generate-voice', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            script: analyzeData.script,
-            voiceTone: formData.voiceTone
-          })
-        });
-        const voiceData = await voiceRes.json();
-        if (voiceRes.ok && voiceData.audioUrl) {
-          audioUrl = voiceData.audioUrl;
-        }
-      } catch (voiceError) {
-        console.error('Voice error:', voiceError);
-      }
-
       setResults({
         caption: analyzeData.caption,
         hashtags: analyzeData.hashtags,
@@ -185,7 +165,7 @@ export default function Home() {
           ...img,
           motionPrompt: motionData.motionPrompts[i] || 'Slow zoom in, 3 seconds'
         })),
-        audioUrl
+        audioUrl: '' // Perplexity doesn't have TTS
       });
 
     } catch (error) {
@@ -197,22 +177,13 @@ export default function Home() {
     }
   };
 
-  const downloadAudio = () => {
-    if (results?.audioUrl) {
-      const link = document.createElement('a');
-      link.href = results.audioUrl;
-      link.download = `voiceover-${formData.productName}.mp3`;
-      link.click();
-    }
-  };
-
   return (
     <>
       <header className="header">
         <h1>✨ Muslimah Content Creator</h1>
         <p>AI-Powered Content Generator untuk Affiliasi Produk Muslimah</p>
         <small style={{ opacity: 0.8, marginTop: '5px', display: 'block' }}>
-          🤖 Powered by OpenAI (GPT-4o, DALL-E 3, TTS)
+          🔍 Powered by Perplexity AI (Sonar)
         </small>
       </header>
 
@@ -374,17 +345,36 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Generated Images */}
+                {/* Image Prompts */}
                 <div className="result-block">
-                  <div className="result-block-title">🖼️ Variasi Gambar</div>
+                  <div className="result-block-title">🖼️ Prompt Gambar AI</div>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '15px' }}>
+                    Copy prompt ini ke DALL-E, Midjourney, atau AI image generator lainnya
+                  </p>
                   <div className="image-grid">
                     {results.images.map((img, i) => (
-                      <div key={i} className="image-item">
-                        <img src={img.url} alt={img.type} />
-                        <span className="image-badge">{img.type}</span>
+                      <div key={i} className="image-item" style={{ aspectRatio: 'auto', padding: '15px' }}>
+                        <div style={{ fontWeight: '600', marginBottom: '8px', color: 'var(--primary)' }}>{img.type}</div>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: '1.4' }}>
+                          {img.description.length > 150 ? img.description.substring(0, 150) + '...' : img.description}
+                        </p>
+                        <button
+                          className="copy-btn"
+                          style={{ display: 'block', marginBottom: '10px' }}
+                          onClick={() => copyToClipboard(img.description)}
+                        >
+                          📋 Copy Prompt
+                        </button>
                         <div className="motion-prompt">
                           <div className="motion-prompt-label">Motion Prompt:</div>
                           <div className="motion-prompt-text">{img.motionPrompt}</div>
+                          <button
+                            className="copy-btn"
+                            style={{ marginTop: '5px', fontSize: '0.7rem' }}
+                            onClick={() => copyToClipboard(img.motionPrompt)}
+                          >
+                            Copy
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -400,20 +390,10 @@ export default function Home() {
                     </button>
                   </div>
                   <div className="script-box">{results.script}</div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '10px' }}>
+                    💡 Gunakan script ini di ElevenLabs, Google TTS, atau tool voice AI lainnya untuk generate voice over
+                  </p>
                 </div>
-
-                {/* Voice Over */}
-                {results.audioUrl && (
-                  <div className="result-block">
-                    <div className="result-block-title">🎙️ Voice Over</div>
-                    <audio controls className="audio-player" src={results.audioUrl} />
-                    <div className="audio-controls">
-                      <button className="btn btn-download" onClick={downloadAudio}>
-                        ⬇️ Download MP3
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 

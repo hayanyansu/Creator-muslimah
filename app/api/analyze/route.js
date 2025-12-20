@@ -4,21 +4,21 @@ export async function POST(request) {
     try {
         const { imageBase64, productName, targetMarket, salesStyle, voiceTone } = await request.json();
 
-        const apiKey = process.env.OPENAI_API_KEY;
+        const apiKey = process.env.PERPLEXITY_API_KEY;
         if (!apiKey) {
-            return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+            return NextResponse.json({ error: 'Perplexity API key not configured' }, { status: 500 });
         }
 
-        // Prepare messages for GPT-4 Vision
+        // Prepare messages for Perplexity Sonar
         const systemPrompt = `Kamu adalah content creator expert untuk produk muslimah Indonesia. 
 Tugas kamu adalah membuat konten marketing yang menarik, relatable, dan sesuai dengan target market.
 Target market: ${targetMarket}
 Gaya penjualan: ${salesStyle}
 Nada suara: ${voiceTone}
 
-PENTING: Berikan response dalam format JSON yang valid (HANYA JSON, tanpa text lain).`;
+PENTING: Berikan response dalam format JSON yang valid (HANYA JSON, tanpa text lain, tanpa markdown code block).`;
 
-        const userPrompt = `Analisis gambar produk "${productName}" dan berikan response dalam format JSON:
+        const userPrompt = `Buatkan konten marketing untuk produk "${productName}" dan berikan response dalam format JSON:
 {
   "productDescription": "deskripsi detail produk dalam 2-3 kalimat untuk prompt gambar AI, dalam bahasa Inggris",
   "caption": "caption Instagram menarik 3-5 paragraf dalam bahasa Indonesia, sesuai gaya ${salesStyle} dan nada ${voiceTone}",
@@ -26,46 +26,32 @@ PENTING: Berikan response dalam format JSON yang valid (HANYA JSON, tanpa text l
   "script": "script narasi video 30-60 detik dalam bahasa Indonesia, sesuai nada ${voiceTone}, untuk voice over"
 }
 
-Pastikan caption dan script sangat menarik, relate dengan target ${targetMarket}, dan menggunakan bahasa yang natural.`;
+Pastikan caption dan script sangat menarik, relate dengan target ${targetMarket}, dan menggunakan bahasa yang natural. Jangan gunakan markdown code block, langsung berikan JSON saja.`;
 
-        // Prepare the messages with image
-        const messages = [
-            { role: 'system', content: systemPrompt },
-            {
-                role: 'user',
-                content: [
-                    { type: 'text', text: userPrompt },
-                    {
-                        type: 'image_url',
-                        image_url: {
-                            url: imageBase64,
-                            detail: 'high'
-                        }
-                    }
-                ]
-            }
-        ];
-
-        // Call OpenAI API
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        // Call Perplexity API
+        const response = await fetch('https://api.perplexity.ai/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: messages,
+                model: 'sonar',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
+                ],
                 max_tokens: 2000,
-                temperature: 0.7
+                temperature: 0.7,
+                disable_search: true
             })
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-            console.error('OpenAI API Error:', data);
-            return NextResponse.json({ error: data.error?.message || 'OpenAI API failed' }, { status: 500 });
+            console.error('Perplexity API Error:', data);
+            return NextResponse.json({ error: data.error?.message || 'Perplexity API failed' }, { status: 500 });
         }
 
         // Parse the JSON response
@@ -79,7 +65,7 @@ Pastikan caption dan script sangat menarik, relate dengan target ${targetMarket}
             const objMatch = jsonStr.match(/\{[\s\S]*\}/);
             result = JSON.parse(objMatch ? objMatch[0] : jsonStr);
         } catch (e) {
-            console.error('Parse error:', e);
+            console.error('Parse error:', e, 'Content:', data.choices?.[0]?.message?.content);
             // Fallback response
             result = {
                 productDescription: `${productName} - high quality product for ${targetMarket}`,
