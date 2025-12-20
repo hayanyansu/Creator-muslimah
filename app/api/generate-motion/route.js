@@ -4,20 +4,20 @@ export async function POST(request) {
     try {
         const { images, productName, script } = await request.json();
 
-        const apiKey = process.env.GROK_API_KEY;
+        const apiKey = process.env.OPENAI_API_KEY;
         if (!apiKey) {
-            return NextResponse.json({ error: 'Grok API key not configured' }, { status: 500 });
+            return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
         }
 
-        // Generate motion prompts for each image using Grok
-        const response = await fetch('https://api.x.ai/v1/chat/completions', {
+        // Generate motion prompts using GPT-4
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'grok-beta',
+                model: 'gpt-4o-mini',
                 messages: [
                     {
                         role: 'system',
@@ -53,14 +53,14 @@ Motion prompts harus:
                     }
                 ],
                 temperature: 0.7,
-                stream: false
+                max_tokens: 1000
             })
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-            console.error('Grok Motion API Error:', data);
+            console.error('OpenAI Motion API Error:', data);
             return NextResponse.json({ error: data.error?.message || 'Motion generation failed' }, { status: 500 });
         }
 

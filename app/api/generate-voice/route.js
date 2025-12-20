@@ -4,13 +4,9 @@ export async function POST(request) {
     try {
         const { script, voiceTone } = await request.json();
 
-        // Since Grok doesn't have TTS, we'll use OpenAI TTS if available
-        // Otherwise, return empty to skip voice generation
-        const openaiKey = process.env.OPENAI_API_KEY;
-
-        if (!openaiKey) {
-            // No TTS available, return empty
-            return NextResponse.json({ audioUrl: '', message: 'TTS not configured' });
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) {
+            return NextResponse.json({ audioUrl: '', error: 'OpenAI API key not configured' }, { status: 500 });
         }
 
         // Map voice tone to OpenAI TTS voice
@@ -29,7 +25,7 @@ export async function POST(request) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${openaiKey}`
+                'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
                 model: 'tts-1',

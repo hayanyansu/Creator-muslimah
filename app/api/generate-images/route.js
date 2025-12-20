@@ -9,39 +9,38 @@ export async function POST(request) {
             return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
         }
 
-        // Define style modifiers based on design style
+        // Style modifiers based on design style
         const styleModifiers = {
-            elegant: 'soft pastel colors, elegant feminine aesthetic, delicate lighting, instagram-worthy',
-            modern: 'clean minimalist design, modern aesthetic, neutral tones with subtle color accents',
-            bold: 'vibrant colors, bold contrast, eye-catching dynamic composition, energetic mood'
+            elegant: 'soft pastel colors, elegant feminine aesthetic, delicate lighting, instagram-worthy, luxury feel',
+            modern: 'clean minimalist design, modern aesthetic, neutral tones with subtle color accents, contemporary style',
+            bold: 'vibrant colors, bold contrast, eye-catching dynamic composition, energetic mood, high impact'
         };
-
         const styleGuide = styleModifiers[designStyle] || styleModifiers.elegant;
 
-        // Generate 4 different image variations
-        const imagePrompts = [
+        // Image prompts for DALL-E 3
+        const imageConfigs = [
             {
                 type: 'Dengan Model',
-                prompt: `Professional product photography of ${productName}. A beautiful confident Indonesian muslim woman wearing elegant hijab, showcasing the product ${productDescription}. ${styleGuide}, professional studio lighting, high-end fashion photography style, 4K quality`
+                prompt: `Professional product photography of ${productName}. A beautiful confident Indonesian muslim woman wearing elegant hijab, holding and showcasing the product: ${productDescription}. ${styleGuide}, professional studio lighting, high-end fashion photography style, 4K quality, photorealistic`
             },
             {
                 type: 'Dengan Model',
-                prompt: `Lifestyle product shot of ${productName}. Young modern Indonesian muslimah in casual hijab style, naturally using/wearing the product ${productDescription} in a cozy home setting. ${styleGuide}, warm natural lighting, Instagram aesthetic, genuine expression`
+                prompt: `Lifestyle product shot of ${productName}. Young modern Indonesian muslimah in casual hijab style, naturally using the product: ${productDescription} in a cozy home setting. ${styleGuide}, warm natural lighting, Instagram aesthetic, candid feel`
             },
             {
                 type: 'Product Shot',
-                prompt: `Clean product photography of ${productName}. ${productDescription}. Isolated product shot with beautiful ${styleGuide}, professional commercial photography, minimalist background, perfect lighting to highlight product details`
+                prompt: `Clean product photography of ${productName}. ${productDescription}. Isolated product shot on clean white background, ${styleGuide}, professional commercial photography, perfect lighting, high detail`
             },
             {
                 type: 'Flat Lay',
-                prompt: `Aesthetic flat lay photography of ${productName}. ${productDescription} arranged beautifully with complementary props like flowers, fabric, or accessories. ${styleGuide}, top-down view, Instagram-worthy composition, soft shadows`
+                prompt: `Aesthetic flat lay photography of ${productName}. ${productDescription} arranged beautifully with complementary props like flowers, fabric, or accessories. ${styleGuide}, top-down view, Instagram-worthy composition`
             }
         ];
 
-        const images = [];
+        const generatedImages = [];
 
-        // Generate each image using DALL-E 3
-        for (const imgPrompt of imagePrompts) {
+        // Generate images with DALL-E 3
+        for (let i = 0; i < imageConfigs.length; i++) {
             try {
                 const response = await fetch('https://api.openai.com/v1/images/generations', {
                     method: 'POST',
@@ -51,43 +50,41 @@ export async function POST(request) {
                     },
                     body: JSON.stringify({
                         model: 'dall-e-3',
-                        prompt: imgPrompt.prompt,
+                        prompt: imageConfigs[i].prompt,
                         n: 1,
                         size: '1024x1024',
-                        quality: 'standard'
+                        quality: 'standard',
+                        response_format: 'url'
                     })
                 });
 
                 const data = await response.json();
 
-                if (!response.ok) {
-                    console.error('DALL-E Error:', data);
-                    // Continue with placeholder if one image fails
-                    images.push({
-                        type: imgPrompt.type,
-                        description: imgPrompt.prompt,
-                        url: `https://placehold.co/1024x1024/9B7B9B/ffffff?text=${encodeURIComponent(imgPrompt.type)}`
+                if (response.ok && data.data?.[0]?.url) {
+                    generatedImages.push({
+                        type: imageConfigs[i].type,
+                        description: imageConfigs[i].prompt,
+                        url: data.data[0].url
                     });
-                    continue;
+                } else {
+                    console.error('DALL-E error:', data);
+                    generatedImages.push({
+                        type: imageConfigs[i].type,
+                        description: imageConfigs[i].prompt,
+                        url: `https://placehold.co/1024x1024/9B7B9B/ffffff?text=${encodeURIComponent(imageConfigs[i].type)}`
+                    });
                 }
-
-                images.push({
-                    type: imgPrompt.type,
-                    description: imgPrompt.prompt,
-                    url: data.data[0].url
-                });
-
-            } catch (error) {
-                console.error('Image generation error:', error);
-                images.push({
-                    type: imgPrompt.type,
-                    description: imgPrompt.prompt,
-                    url: `https://placehold.co/1024x1024/9B7B9B/ffffff?text=${encodeURIComponent(imgPrompt.type)}`
+            } catch (imgError) {
+                console.error('Image generation error:', imgError);
+                generatedImages.push({
+                    type: imageConfigs[i].type,
+                    description: imageConfigs[i].prompt,
+                    url: `https://placehold.co/1024x1024/9B7B9B/ffffff?text=${encodeURIComponent(imageConfigs[i].type)}`
                 });
             }
         }
 
-        return NextResponse.json({ images });
+        return NextResponse.json({ images: generatedImages });
 
     } catch (error) {
         console.error('Generate images error:', error);

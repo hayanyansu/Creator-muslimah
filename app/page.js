@@ -129,39 +129,19 @@ export default function Home() {
       const analyzeData = await analyzeRes.json();
       if (!analyzeRes.ok) throw new Error(analyzeData.error);
 
-      // Step 2: Generate placeholder images (Grok doesn't have image generation)
-      setLoadingStep('Menyiapkan variasi gambar...');
-
-      const styleModifiers = {
-        elegant: 'soft pastel colors, elegant feminine aesthetic',
-        modern: 'clean minimalist design, modern aesthetic',
-        bold: 'vibrant colors, bold contrast'
-      };
-      const styleGuide = styleModifiers[formData.designStyle] || styleModifiers.elegant;
-
-      // Create image prompts for manual generation later
-      const imagePrompts = [
-        {
-          type: 'Dengan Model',
-          prompt: `Professional product photography of ${formData.productName}. A beautiful confident Indonesian muslim woman wearing elegant hijab, showcasing the product. ${styleGuide}, professional studio lighting, 4K quality`,
-          url: productImage // Use uploaded image as placeholder
-        },
-        {
-          type: 'Dengan Model',
-          prompt: `Lifestyle product shot of ${formData.productName}. Young modern Indonesian muslimah naturally using the product. ${styleGuide}, warm natural lighting, Instagram aesthetic`,
-          url: productImage
-        },
-        {
-          type: 'Product Shot',
-          prompt: `Clean product photography of ${formData.productName}. ${analyzeData.productDescription}. ${styleGuide}, minimalist background`,
-          url: productImage
-        },
-        {
-          type: 'Flat Lay',
-          prompt: `Aesthetic flat lay photography of ${formData.productName}. ${styleGuide}, top-down view, Instagram-worthy composition`,
-          url: productImage
-        }
-      ];
+      // Step 2: Generate images with DALL-E 3
+      setLoadingStep('Membuat variasi gambar produk...');
+      const imagesRes = await fetch('/api/generate-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productDescription: analyzeData.productDescription,
+          productName: formData.productName,
+          designStyle: formData.designStyle
+        })
+      });
+      const imagesData = await imagesRes.json();
+      if (!imagesRes.ok) throw new Error(imagesData.error);
 
       // Step 3: Generate motion prompts
       setLoadingStep('Membuat prompt untuk motion...');
@@ -169,7 +149,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          images: imagePrompts,
+          images: imagesData.images,
           productName: formData.productName,
           script: analyzeData.script
         })
@@ -190,7 +170,7 @@ export default function Home() {
           })
         });
         const voiceData = await voiceRes.json();
-        if (voiceRes.ok) {
+        if (voiceRes.ok && voiceData.audioUrl) {
           audioUrl = voiceData.audioUrl;
         }
       } catch (voiceError) {
@@ -201,7 +181,7 @@ export default function Home() {
         caption: analyzeData.caption,
         hashtags: analyzeData.hashtags,
         script: analyzeData.script,
-        images: imagePrompts.map((img, i) => ({
+        images: imagesData.images.map((img, i) => ({
           ...img,
           motionPrompt: motionData.motionPrompts[i] || 'Slow zoom in, 3 seconds'
         })),
@@ -232,7 +212,7 @@ export default function Home() {
         <h1>✨ Muslimah Content Creator</h1>
         <p>AI-Powered Content Generator untuk Affiliasi Produk Muslimah</p>
         <small style={{ opacity: 0.8, marginTop: '5px', display: 'block' }}>
-          🚀 Powered by Grok AI
+          🤖 Powered by OpenAI (GPT-4o, DALL-E 3, TTS)
         </small>
       </header>
 
@@ -394,25 +374,15 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Image Prompts */}
+                {/* Generated Images */}
                 <div className="result-block">
-                  <div className="result-block-title">🖼️ Prompt Gambar (untuk AI Image Generator)</div>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '15px' }}>
-                    Gunakan prompt ini di DALL-E, Midjourney, atau AI image generator lainnya
-                  </p>
+                  <div className="result-block-title">🖼️ Variasi Gambar</div>
                   <div className="image-grid">
                     {results.images.map((img, i) => (
-                      <div key={i} className="image-item" style={{ aspectRatio: 'auto', padding: '15px' }}>
-                        <div style={{ fontWeight: '600', marginBottom: '8px', color: 'var(--primary)' }}>{img.type}</div>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>{img.prompt}</p>
-                        <button
-                          className="copy-btn"
-                          style={{ display: 'block' }}
-                          onClick={() => copyToClipboard(img.prompt)}
-                        >
-                          Copy Prompt
-                        </button>
-                        <div className="motion-prompt" style={{ marginTop: '10px' }}>
+                      <div key={i} className="image-item">
+                        <img src={img.url} alt={img.type} />
+                        <span className="image-badge">{img.type}</span>
+                        <div className="motion-prompt">
                           <div className="motion-prompt-label">Motion Prompt:</div>
                           <div className="motion-prompt-text">{img.motionPrompt}</div>
                         </div>
